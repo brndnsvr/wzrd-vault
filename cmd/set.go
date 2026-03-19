@@ -1,17 +1,26 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/brndnsvr/wzrd-vault/internal/cli"
 	"github.com/brndnsvr/wzrd-vault/internal/config"
 	"github.com/brndnsvr/wzrd-vault/internal/crypto"
+	"github.com/brndnsvr/wzrd-vault/internal/duration"
 	"github.com/brndnsvr/wzrd-vault/internal/store"
 	"github.com/spf13/cobra"
 )
 
-var setForce bool
+var (
+	setForce   bool
+	setExpires string
+	setTags    []string
+	setNote    string
+)
 
 var setCmd = &cobra.Command{
 	Use:   "set <path>",
@@ -101,8 +110,44 @@ Examples:
 			return err
 		}
 
+		// Build metadata JSON.
+		var metadata *string
+		if len(setTags) > 0 || setNote != "" {
+			meta := map[string]any{}
+			if len(setTags) > 0 {
+				tags := map[string]string{}
+				for _, tag := range setTags {
+					k, v, ok := strings.Cut(tag, "=")
+					if !ok {
+						return fmt.Errorf("invalid tag %q: expected key=value format", tag)
+					}
+					tags[k] = v
+				}
+				meta["tags"] = tags
+			}
+			if setNote != "" {
+				meta["note"] = setNote
+			}
+			jsonBytes, err := json.Marshal(meta)
+			if err != nil {
+				return fmt.Errorf("encoding metadata: %w", err)
+			}
+			metaStr := string(jsonBytes)
+			metadata = &metaStr
+		}
+
+		// Parse expiry.
+		var expiresAt *time.Time
+		if setExpires != "" {
+			t, err := duration.ParseExpiry(setExpires)
+			if err != nil {
+				return err
+			}
+			expiresAt = &t
+		}
+
 		// Store.
-		if err := s.Set(path, ciphertext, nil, nil); err != nil {
+		if err := s.Set(path, ciphertext, metadata, expiresAt); err != nil {
 			return err
 		}
 
@@ -113,5 +158,8 @@ Examples:
 
 func init() {
 	setCmd.Flags().BoolVar(&setForce, "force", false, "overwrite existing secret without confirmation")
+	setCmd.Flags().StringVar(&setExpires, "expires", "", "set expiry (90d, 24h, 12w, 6m, 1y, or 2026-12-31)")
+	setCmd.Flags().StringArrayVar(&setTags, "tag", nil, "key=value tag (repeatable)")
+	setCmd.Flags().StringVar(&setNote, "note", "", "human-readable note")
 	rootCmd.AddCommand(setCmd)
 }
