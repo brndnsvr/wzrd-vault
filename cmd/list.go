@@ -29,7 +29,7 @@ Optionally filter by prefix:
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 
 		prefix := ""
 		if len(args) > 0 {

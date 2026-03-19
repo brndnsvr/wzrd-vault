@@ -35,7 +35,7 @@ Use --prefix to delete all secrets matching a prefix:
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 
 		if deletePrefix {
 			return deleteByPrefix(s, path)

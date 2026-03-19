@@ -38,7 +38,7 @@ The passphrase prompt goes to stderr, so piping works correctly:
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 
 		// Retrieve ciphertext.
 		secret, err := s.Get(path)

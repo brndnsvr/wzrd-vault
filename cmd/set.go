@@ -62,14 +62,14 @@ Examples:
 		if err != nil {
 			return err
 		}
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 
 		if !setForce && s.Exists(path) {
 			tty, ttyErr := os.OpenFile("/dev/tty", os.O_RDONLY, 0)
 			if ttyErr != nil {
 				return fmt.Errorf("secret %q already exists — use --force to overwrite", path)
 			}
-			defer tty.Close()
+			defer func() { _ = tty.Close() }()
 			confirmed := cli.PromptYesNo(tty, os.Stderr, fmt.Sprintf("Secret %q already exists. Overwrite?", path))
 			if !confirmed {
 				fmt.Fprintln(os.Stderr, "aborted — use --force to overwrite")
