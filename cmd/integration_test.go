@@ -327,3 +327,154 @@ func TestIntegration_FullLifecycle(t *testing.T) {
 		t.Errorf("list after delete returned %d, want 2", len(lines))
 	}
 }
+
+func TestIntegration_ExportImportRoundTrip(t *testing.T) {
+	v := setupTestVault(t)
+
+	// Store some secrets.
+	v.run(t, "tacacs-key-123", "set", "work/tacacs/key")
+	v.run(t, "snmp-pass-456", "set", "work/snmp/auth")
+	v.run(t, "github-pat-789", "set", "dev/github/pat")
+
+	// Export as JSON.
+	jsonOut, stderr, code := v.run(t, "", "export", "--format", "json")
+	if code != 0 {
+		t.Fatalf("export exit code = %d, stderr: %s", code, stderr)
+	}
+
+	// Verify JSON contains all secrets.
+	if !strings.Contains(jsonOut, "tacacs-key-123") {
+		t.Errorf("export JSON missing tacacs value")
+	}
+	if !strings.Contains(jsonOut, "snmp-pass-456") {
+		t.Errorf("export JSON missing snmp value")
+	}
+
+	// Delete all secrets.
+	v.run(t, "", "delete", "--prefix", "--force", "work/")
+	v.run(t, "", "delete", "--force", "dev/github/pat")
+
+	// Verify empty.
+	stdout, _, _ := v.run(t, "", "list")
+	if strings.TrimSpace(stdout) != "" {
+		t.Fatalf("expected empty store after delete, got: %s", stdout)
+	}
+
+	// Import the JSON back.
+	_, stderr, code = v.run(t, jsonOut, "import", "--format", "json")
+	if code != 0 {
+		t.Fatalf("import exit code = %d, stderr: %s", code, stderr)
+	}
+
+	// Verify all secrets restored.
+	for _, tc := range []struct{ path, want string }{
+		{"work/tacacs/key", "tacacs-key-123"},
+		{"work/snmp/auth", "snmp-pass-456"},
+		{"dev/github/pat", "github-pat-789"},
+	} {
+		stdout, _, code := v.run(t, "", "get", tc.path)
+		if code != 0 {
+			t.Errorf("get %s after import: exit %d", tc.path, code)
+		}
+		if stdout != tc.want {
+			t.Errorf("get %s = %q, want %q", tc.path, stdout, tc.want)
+		}
+	}
+}
+
+func TestIntegration_Metadata(t *testing.T) {
+	v := setupTestVault(t)
+
+	// Set with metadata.
+	_, _, code := v.run(t, "secret-val", "set", "work/tagged",
+		"--tag", "env=prod", "--tag", "team=net", "--note", "test note", "--expires", "90d")
+	if code != 0 {
+		t.Fatalf("set with metadata exit code = %d", code)
+	}
+
+	// List as JSON and verify metadata.
+	stdout, _, code := v.run(t, "", "list", "--json")
+	if code != 0 {
+		t.Fatalf("list --json exit code = %d", code)
+	}
+	if !strings.Contains(stdout, "env") || !strings.Contains(stdout, "prod") {
+		t.Errorf("list --json missing tag env=prod: %s", stdout)
+	}
+	if !strings.Contains(stdout, "test note") {
+		t.Errorf("list --json missing note: %s", stdout)
+	}
+	if !strings.Contains(stdout, "expires_at") {
+		t.Errorf("list --json missing expires_at: %s", stdout)
+	}
+}
+
+func TestIntegration_ExportFormats(t *testing.T) {
+	v := setupTestVault(t)
+	v.run(t, "myvalue", "set", "work/test/key")
+
+	// Dotenv format.
+	stdout, _, _ := v.run(t, "", "export", "--format", "dotenv")
+	if !strings.Contains(stdout, "WORK_TEST_KEY=myvalue") {
+		t.Errorf("dotenv format = %q, want WORK_TEST_KEY=myvalue", stdout)
+	}
+
+	// Shell format.
+	stdout, _, _ = v.run(t, "", "export", "--format", "shell")
+	if !strings.Contains(stdout, "export WORK_TEST_KEY='myvalue'") {
+		t.Errorf("shell format = %q, want export WORK_TEST_KEY='myvalue'", stdout)
+	}
+
+	// Prefix strip.
+	stdout, _, _ = v.run(t, "", "export", "work/", "--prefix-strip", "work/", "--format", "dotenv")
+	if !strings.Contains(stdout, "TEST_KEY=myvalue") {
+		t.Errorf("prefix-strip format = %q, want TEST_KEY=myvalue", stdout)
+	}
+}
+
+func TestIntegration_ImportDryRun(t *testing.T) {
+	v := setupTestVault(t)
+
+	dotenv := "MY_KEY=hello\nOTHER_KEY=world\n"
+	_, stderr, code := v.run(t, dotenv, "import", "--dry-run")
+	if code != 0 {
+		t.Fatalf("import --dry-run exit code = %d", code)
+	}
+	if !strings.Contains(stderr, "my/key") || !strings.Contains(stderr, "other/key") {
+		t.Errorf("dry-run stderr should list paths: %s", stderr)
+	}
+
+	// Verify nothing was actually imported.
+	stdout, _, _ := v.run(t, "", "list")
+	if strings.TrimSpace(stdout) != "" {
+		t.Errorf("dry-run should not import, but list shows: %s", stdout)
+	}
+}
+
+func TestIntegration_VersionJSON(t *testing.T) {
+	v := setupTestVault(t)
+	stdout, _, code := v.run(t, "", "version", "--json")
+	if code != 0 {
+		t.Fatalf("version --json exit code = %d", code)
+	}
+	if !strings.Contains(stdout, "\"version\"") {
+		t.Errorf("version --json missing version key: %s", stdout)
+	}
+	if !strings.Contains(stdout, "\"commit\"") {
+		t.Errorf("version --json missing commit key: %s", stdout)
+	}
+}
+
+func TestIntegration_Completion(t *testing.T) {
+	v := setupTestVault(t)
+	for _, shell := range []string{"bash", "zsh", "fish", "powershell"} {
+		t.Run(shell, func(t *testing.T) {
+			stdout, _, code := v.run(t, "", "completion", shell)
+			if code != 0 {
+				t.Errorf("completion %s exit code = %d", shell, code)
+			}
+			if stdout == "" {
+				t.Errorf("completion %s produced no output", shell)
+			}
+		})
+	}
+}
