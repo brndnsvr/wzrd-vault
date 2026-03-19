@@ -76,25 +76,46 @@ The passphrase prompt goes to stderr, so piping works correctly:
 
 // resolvePrivateKey gets the private key using the configured method:
 // 1. WZVAULT_AGE_KEY env var (raw key)
-// 2. Interactive passphrase prompt to decrypt identity.age
+// 2. WZVAULT_PASSPHRASE_FD — read passphrase from file descriptor
+// 3. Interactive passphrase prompt to decrypt identity.age
 func resolvePrivateKey(cfg config.Config) (string, error) {
+	// 1. WZVAULT_AGE_KEY — raw private key from env.
 	if cfg.AgeKey != "" {
 		return cfg.AgeKey, nil
 	}
 
-	// Read encrypted identity.
+	// 2. WZVAULT_PASSPHRASE_FD — read passphrase from file descriptor.
+	if cfg.PassphraseFD != "" {
+		fd, err := strconv.Atoi(cfg.PassphraseFD)
+		if err != nil {
+			return "", fmt.Errorf("invalid WZVAULT_PASSPHRASE_FD value %q: %w", cfg.PassphraseFD, err)
+		}
+		encrypted, err := os.ReadFile(cfg.IdentityPath)
+		if err != nil {
+			return "", fmt.Errorf("reading identity at %s — run \"wzrd-vault init\" to create it: %w", cfg.IdentityPath, err)
+		}
+		passphrase, err := cli.ReadPassphraseFromFD(fd)
+		if err != nil {
+			return "", err
+		}
+		privateKey, err := crypto.DecryptIdentity(encrypted, passphrase)
+		if err != nil {
+			return "", fmt.Errorf("decrypting identity — wrong passphrase from fd %d? %w", fd, err)
+		}
+		return privateKey, nil
+	}
+
+	// 3. Interactive prompt — fallback.
 	encrypted, err := os.ReadFile(cfg.IdentityPath)
 	if err != nil {
 		return "", fmt.Errorf("reading identity at %s — run \"wzrd-vault init\" to create it: %w", cfg.IdentityPath, err)
 	}
 
-	// Prompt for passphrase.
 	passphrase, err := cli.PromptPassphrase()
 	if err != nil {
 		return "", err
 	}
 
-	// Decrypt identity.
 	privateKey, err := crypto.DecryptIdentity(encrypted, passphrase)
 	if err != nil {
 		return "", fmt.Errorf("decrypting identity — wrong passphrase? %w", err)

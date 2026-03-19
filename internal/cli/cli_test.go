@@ -80,11 +80,11 @@ func TestReadPassphraseFromFD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	go func() {
-		w.WriteString("my-passphrase\n")
-		w.Close()
+		_, _ = w.WriteString("my-passphrase\n")
+		_ = w.Close()
 	}()
 
 	got, err := ReadPassphraseFromFD(int(r.Fd()))
