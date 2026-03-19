@@ -1,0 +1,12 @@
+# wzrd-vault configuration
+# Copy to ~/.config/wzrd-vault/config.toml and uncomment to customize.
+
+# Database location (default: ~/.config/wzrd-vault/stash.db)
+# db = "~/.config/wzrd-vault/stash.db"
+
+# Preferred editor for `wzrd-vault edit` (overrides $EDITOR/$VISUAL)
+# editor = "vi"
+
+# Default expiration for new secrets (optional, no default)
+# Accepts durations (90d, 24h, 12w, 6m, 1y) or dates (2026-12-31)
+# default_expires = "365d"

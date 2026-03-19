@@ -1,0 +1,33 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - gocritic
+    - gofumpt
+    - goimports
+    - misspell
+    - nolintlint
+
+linters-settings:
+  gocritic:
+    enabled-checks:
+      - dupImport
+      - ifElseChain
+      - nestingReduce
+      - truncateCmp
+      - unnamedResult
+  gofumpt:
+    extra-rules: true
+  errcheck:
+    check-type-assertions: true
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
