@@ -88,6 +88,22 @@ func PromptPassphrase() (string, error) {
 	return string(passphrase), nil
 }
 
+// ReadPassphraseFromFD reads a passphrase from the given file descriptor.
+// Strips trailing newlines. Used for WZVAULT_PASSPHRASE_FD support.
+func ReadPassphraseFromFD(fd int) (string, error) {
+	f := os.NewFile(uintptr(fd), "passphrase-fd")
+	if f == nil {
+		return "", fmt.Errorf("invalid file descriptor: %d", fd)
+	}
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return "", fmt.Errorf("reading passphrase from fd %d: %w", fd, err)
+	}
+	s := strings.TrimRight(string(data), "\r\n")
+	return s, nil
+}
+
 // SecretsMatch compares two secret strings for equality.
 func SecretsMatch(a, b string) bool {
 	return a == b

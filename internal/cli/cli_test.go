@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -71,5 +72,26 @@ func TestPromptConfirmation_Default_No(t *testing.T) {
 	confirmed := PromptYesNo(input, &output, "Delete this?")
 	if confirmed {
 		t.Error("expected rejection with empty input (default no)")
+	}
+}
+
+func TestReadPassphraseFromFD(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	go func() {
+		w.WriteString("my-passphrase\n")
+		w.Close()
+	}()
+
+	got, err := ReadPassphraseFromFD(int(r.Fd()))
+	if err != nil {
+		t.Fatalf("ReadPassphraseFromFD() error: %v", err)
+	}
+	if got != "my-passphrase" {
+		t.Errorf("got %q, want %q", got, "my-passphrase")
 	}
 }

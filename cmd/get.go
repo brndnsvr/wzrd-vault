@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/brndnsvr/wzrd-vault/internal/cli"
 	"github.com/brndnsvr/wzrd-vault/internal/config"
