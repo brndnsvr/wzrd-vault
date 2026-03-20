@@ -1,0 +1,55 @@
+version: 2
+project_name: wzrd-vault
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+
+brews:
+  - repository:
+      owner: brndnsvr
+      name: homebrew-tap
+    homepage: "https://github.com/brndnsvr/wzrd-vault"
+    description: "Local-first secrets manager. Never leaks secrets to process arguments."
+    license: "MIT"
+    install: |
+      bin.install "wzrd-vault"
+    test: |
+      system "#{bin}/wzrd-vault", "version"
