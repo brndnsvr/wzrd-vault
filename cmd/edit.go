@@ -189,11 +189,17 @@ func secureDelete(path string) {
 	info, err := f.Stat()
 	if err == nil && info.Size() > 0 {
 		zeros := make([]byte, info.Size())
-		_, _ = f.WriteAt(zeros, 0)
-		_ = f.Sync()
+		if _, err := f.WriteAt(zeros, 0); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to zero temp file %s: %v\n", path, err)
+		}
+		if err := f.Sync(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to sync temp file %s: %v\n", path, err)
+		}
 	}
 	_ = f.Close()
-	_ = os.Remove(path)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "warning: failed to remove temp file %s: %v\n", path, err)
+	}
 }
 
 // filterEnv returns a copy of env with the named variable removed.

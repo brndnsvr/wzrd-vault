@@ -98,8 +98,18 @@ Examples:
 				if err != nil {
 					return fmt.Errorf("decrypting %q: %w", entry.Path, err)
 				}
-				escaped := strings.ReplaceAll(string(plaintext), "'", `'\''`)
-				fmt.Printf("export %s='%s'\n", pathToEnvVar(entry.Path), escaped)
+				value := string(plaintext)
+				envVar := pathToEnvVar(entry.Path)
+				if strings.ContainsAny(value, "\n\r") {
+					escaped := strings.ReplaceAll(value, `\`, `\\`)
+					escaped = strings.ReplaceAll(escaped, "'", `\'`)
+					escaped = strings.ReplaceAll(escaped, "\n", `\n`)
+					escaped = strings.ReplaceAll(escaped, "\r", `\r`)
+					fmt.Printf("export %s=$'%s'\n", envVar, escaped)
+				} else {
+					escaped := strings.ReplaceAll(value, "'", `'\''`)
+					fmt.Printf("export %s='%s'\n", envVar, escaped)
+				}
 			}
 			return nil
 
