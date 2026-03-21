@@ -46,8 +46,7 @@ Use --prefix to delete all secrets matching a prefix:
 
 func deleteSingle(s *store.Store, path string) error {
 	if !s.Exists(path) {
-		fmt.Fprintf(os.Stderr, "secret not found: %q — run \"wzrd-vault list\" to see available paths\n", path)
-		os.Exit(3)
+		return newExitError(3, "secret not found: %q — run \"wzrd-vault list\" to see available paths", path)
 	}
 
 	if !deleteForce {
@@ -71,8 +70,7 @@ func deleteByPrefix(s *store.Store, prefix string) error {
 		return err
 	}
 	if len(entries) == 0 {
-		fmt.Fprintf(os.Stderr, "No secrets found matching prefix %q\n", prefix)
-		os.Exit(3)
+		return newExitError(3, "no secrets found matching prefix %q", prefix)
 	}
 
 	if !deleteForce {

@@ -81,8 +81,7 @@ Examples:
 			defer func() { _ = tty.Close() }()
 			confirmed := cli.PromptYesNo(tty, os.Stderr, fmt.Sprintf("Secret %q already exists. Overwrite?", path))
 			if !confirmed {
-				fmt.Fprintln(os.Stderr, "aborted — use --force to overwrite")
-				os.Exit(2)
+				return newExitError(2, "aborted — use --force to overwrite")
 			}
 		}
 

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"crypto/subtle"
 	"fmt"
 	"io"
 	"os"
@@ -95,6 +96,7 @@ func ReadPassphraseFromFD(fd int) (string, error) {
 	if f == nil {
 		return "", fmt.Errorf("invalid file descriptor: %d", fd)
 	}
+	defer func() { _ = f.Close() }()
 
 	data, err := io.ReadAll(f)
 	if err != nil {
@@ -106,7 +108,7 @@ func ReadPassphraseFromFD(fd int) (string, error) {
 
 // SecretsMatch compares two secret strings for equality.
 func SecretsMatch(a, b string) bool {
-	return a == b
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 // PromptYesNo prompts the user with a yes/no question.

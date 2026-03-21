@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -91,6 +92,11 @@ func Open(dbPath string) (*Store, error) {
 	if err := s.migrate(); err != nil {
 		_ = db.Close()
 		return nil, err
+	}
+
+	if err := os.Chmod(dbPath, 0o600); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("setting database permissions: %w", err)
 	}
 
 	return s, nil

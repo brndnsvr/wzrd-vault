@@ -32,6 +32,13 @@ a command-line argument.`,
 			return fmt.Errorf("store already exists at %s — use --force to reinitialize (this will destroy existing secrets)", cfg.DBPath)
 		}
 
+		// If force reinit, remove old files.
+		if initForce {
+			_ = os.Remove(cfg.DBPath)
+			_ = os.Remove(cfg.IdentityPath)
+			_ = os.Remove(cfg.PublicKeyPath)
+		}
+
 		// Create config directory.
 		if err := os.MkdirAll(cfg.Dir, 0o700); err != nil {
 			return fmt.Errorf("creating config directory at %s: %w", cfg.Dir, err)

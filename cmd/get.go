@@ -45,9 +45,7 @@ The passphrase prompt goes to stderr, so piping works correctly:
 		secret, err := s.Get(path)
 		if err != nil {
 			if store.IsNotFound(err) {
-				// Exit code 3 for not found.
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(3)
+				return newExitError(3, "%v", err)
 			}
 			return err
 		}
