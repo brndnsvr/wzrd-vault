@@ -71,28 +71,61 @@ Examples:
 			return err
 		}
 
-		// Decrypt all secrets.
-		secrets := make([]decryptedSecret, 0, len(entries))
-		for _, entry := range entries {
-			secret, err := s.Get(entry.Path)
-			if err != nil {
-				return err
-			}
-			plaintext, err := crypto.Decrypt(secret.Ciphertext, privateKey)
-			if err != nil {
-				return fmt.Errorf("decrypting %q: %w", entry.Path, err)
-			}
-			secrets = append(secrets, decryptedSecret{path: entry.Path, value: string(plaintext)})
-		}
-
-		// Output in requested format.
 		switch exportFormat {
 		case "json":
+			// JSON needs all values at once for the map.
+			secrets := make([]decryptedSecret, 0, len(entries))
+			for _, entry := range entries {
+				secret, err := s.Get(entry.Path)
+				if err != nil {
+					return err
+				}
+				plaintext, err := crypto.Decrypt(secret.Ciphertext, privateKey)
+				if err != nil {
+					return fmt.Errorf("decrypting %q: %w", entry.Path, err)
+				}
+				secrets = append(secrets, decryptedSecret{path: entry.Path, value: string(plaintext)})
+			}
 			return exportJSON(secrets)
+
 		case "shell":
-			return exportShell(secrets)
+			for _, entry := range entries {
+				secret, err := s.Get(entry.Path)
+				if err != nil {
+					return err
+				}
+				plaintext, err := crypto.Decrypt(secret.Ciphertext, privateKey)
+				if err != nil {
+					return fmt.Errorf("decrypting %q: %w", entry.Path, err)
+				}
+				escaped := strings.ReplaceAll(string(plaintext), "'", `'\''`)
+				fmt.Printf("export %s='%s'\n", pathToEnvVar(entry.Path), escaped)
+			}
+			return nil
+
 		case "dotenv", "":
-			return exportDotenv(secrets)
+			for _, entry := range entries {
+				secret, err := s.Get(entry.Path)
+				if err != nil {
+					return err
+				}
+				plaintext, err := crypto.Decrypt(secret.Ciphertext, privateKey)
+				if err != nil {
+					return fmt.Errorf("decrypting %q: %w", entry.Path, err)
+				}
+				value := string(plaintext)
+				envVar := pathToEnvVar(entry.Path)
+				if needsQuoting(value) {
+					escaped := strings.ReplaceAll(value, `\`, `\\`)
+					escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+					escaped = strings.ReplaceAll(escaped, "\n", `\n`)
+					fmt.Printf("%s=\"%s\"\n", envVar, escaped)
+				} else {
+					fmt.Printf("%s=%s\n", envVar, value)
+				}
+			}
+			return nil
+
 		default:
 			return fmt.Errorf("unknown format %q — use dotenv, json, or shell", exportFormat)
 		}
@@ -109,11 +142,8 @@ func pathToEnvVar(path string) string {
 	return strings.ToUpper(strings.ReplaceAll(path, "/", "_"))
 }
 
-func exportDotenv(secrets []decryptedSecret) error {
-	for _, s := range secrets {
-		fmt.Printf("%s=%s\n", pathToEnvVar(s.path), s.value)
-	}
-	return nil
+func needsQuoting(s string) bool {
+	return strings.ContainsAny(s, " \t\n\r\"'$#\\`!") || s == ""
 }
 
 func exportJSON(secrets []decryptedSecret) error {
@@ -124,15 +154,6 @@ func exportJSON(secrets []decryptedSecret) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(m)
-}
-
-func exportShell(secrets []decryptedSecret) error {
-	for _, s := range secrets {
-		// Escape embedded single quotes: ' → '\''
-		escaped := strings.ReplaceAll(s.value, "'", `'\''`)
-		fmt.Printf("export %s='%s'\n", pathToEnvVar(s.path), escaped)
-	}
-	return nil
 }
 
 func init() {
