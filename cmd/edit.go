@@ -6,7 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/brndnsvr/wzrd-vault/internal/config"
@@ -73,19 +75,21 @@ unlinked) on exit, even if interrupted by SIGINT or SIGTERM.`,
 		}
 		tmpPath := tmpFile.Name()
 
-		// Ensure cleanup on any exit path.
+		// Ensure cleanup on any exit path — use sync.Once for thread safety.
+		var cleanupOnce sync.Once
 		cleanup := func() {
-			secureDelete(tmpPath)
+			cleanupOnce.Do(func() { secureDelete(tmpPath) })
 		}
 		defer cleanup()
 
 		// Register signal handlers for cleanup.
 		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 		go func() {
-			<-sigCh
-			cleanup()
-			os.Exit(1)
+			if _, ok := <-sigCh; ok {
+				cleanup()
+				os.Exit(1)
+			}
 		}()
 
 		// Set permissions and write plaintext.
@@ -107,10 +111,14 @@ unlinked) on exit, even if interrupted by SIGINT or SIGTERM.`,
 		editorCmd.Stdin = os.Stdin
 		editorCmd.Stdout = os.Stdout
 		editorCmd.Stderr = os.Stderr
+		// Don't leak WZVAULT_AGE_KEY to the editor process.
+		editorCmd.Env = filterEnv(os.Environ(), "WZVAULT_AGE_KEY")
 
 		if err := editorCmd.Run(); err != nil {
 			return fmt.Errorf("editor exited with error: %w — secret not updated", err)
 		}
+		signal.Stop(sigCh)
+		close(sigCh)
 
 		// Read edited content.
 		edited, err := os.ReadFile(tmpPath)
@@ -149,31 +157,55 @@ func secureTmpDir() string {
 	if info, err := os.Stat("/dev/shm"); err == nil && info.IsDir() {
 		return "/dev/shm"
 	}
+	// On macOS, create a private temp directory under the user cache.
+	if cacheDir, err := os.UserCacheDir(); err == nil {
+		privDir := filepath.Join(cacheDir, "wzrd-vault")
+		if err := os.MkdirAll(privDir, 0o700); err == nil {
+			return privDir
+		}
+	}
 	return os.TempDir()
 }
 
 // chooseEditor returns the user's preferred editor.
 func chooseEditor() string {
-	if editor := os.Getenv("EDITOR"); editor != "" {
+	if editor := os.Getenv("VISUAL"); editor != "" {
 		return editor
 	}
-	if editor := os.Getenv("VISUAL"); editor != "" {
+	if editor := os.Getenv("EDITOR"); editor != "" {
 		return editor
 	}
 	return "vi"
 }
 
-// secureDelete overwrites a file with zeros then removes it.
+// secureDelete overwrites a file with zeros in place, fsyncs, then removes it.
 func secureDelete(path string) {
-	info, err := os.Stat(path)
+	f, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
-		return // File doesn't exist, nothing to clean up.
+		// File may already be gone.
+		_ = os.Remove(path)
+		return
 	}
-	// Overwrite with zeros.
-	zeros := make([]byte, info.Size())
-	_ = os.WriteFile(path, zeros, 0o600)
-	// Remove the file.
+	info, err := f.Stat()
+	if err == nil && info.Size() > 0 {
+		zeros := make([]byte, info.Size())
+		_, _ = f.WriteAt(zeros, 0)
+		_ = f.Sync()
+	}
+	_ = f.Close()
 	_ = os.Remove(path)
+}
+
+// filterEnv returns a copy of env with the named variable removed.
+func filterEnv(env []string, name string) []string {
+	prefix := name + "="
+	filtered := make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			filtered = append(filtered, e)
+		}
+	}
+	return filtered
 }
 
 func init() {
