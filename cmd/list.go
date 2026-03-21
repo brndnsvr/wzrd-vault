@@ -25,7 +25,7 @@ var listCmd = &cobra.Command{
 because paths are not encrypted — only values are.
 
 Optionally filter by prefix:
-  wzrd-vault list work/network/`,
+  wzrd-vault list work/`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.Load()
