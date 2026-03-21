@@ -162,10 +162,14 @@ func TestExists(t *testing.T) {
 	s := newTestStore(t)
 	_ = s.Set("work/key", []byte("data"), nil, nil)
 
-	if !s.Exists("work/key") {
+	if exists, err := s.Exists("work/key"); err != nil {
+		t.Fatalf("Exists() error: %v", err)
+	} else if !exists {
 		t.Error("Exists() = false for existing path")
 	}
-	if s.Exists("nonexistent/path") {
+	if exists, err := s.Exists("nonexistent/path"); err != nil {
+		t.Fatalf("Exists() error: %v", err)
+	} else if exists {
 		t.Error("Exists() = true for missing path")
 	}
 }

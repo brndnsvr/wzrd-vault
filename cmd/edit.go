@@ -31,8 +31,8 @@ unlinked) on exit, even if interrupted by SIGINT or SIGTERM.`,
 		path := args[0]
 		cfg := config.Load()
 
-		if _, err := os.Stat(cfg.DBPath); os.IsNotExist(err) {
-			return fmt.Errorf("database not found at %s — run \"wzrd-vault init\" to create it", cfg.DBPath)
+		if err := requireStore(cfg); err != nil {
+			return err
 		}
 
 		s, err := store.Open(cfg.DBPath)
@@ -107,7 +107,7 @@ unlinked) on exit, even if interrupted by SIGINT or SIGTERM.`,
 
 		// Open editor.
 		editor := chooseEditor()
-		editorCmd := exec.Command(editor, tmpPath)
+		editorCmd := exec.Command(editor, tmpPath) //nolint:gosec // editor is user-chosen via $EDITOR/$VISUAL
 		editorCmd.Stdin = os.Stdin
 		editorCmd.Stdout = os.Stdout
 		editorCmd.Stderr = os.Stderr
@@ -121,7 +121,7 @@ unlinked) on exit, even if interrupted by SIGINT or SIGTERM.`,
 		close(sigCh)
 
 		// Read edited content.
-		edited, err := os.ReadFile(tmpPath)
+		edited, err := os.ReadFile(tmpPath) //nolint:gosec // path is a temp file we created
 		if err != nil {
 			return fmt.Errorf("reading edited file: %w", err)
 		}
@@ -180,7 +180,7 @@ func chooseEditor() string {
 
 // secureDelete overwrites a file with zeros in place, fsyncs, then removes it.
 func secureDelete(path string) {
-	f, err := os.OpenFile(path, os.O_WRONLY, 0)
+	f, err := os.OpenFile(path, os.O_WRONLY, 0) //nolint:gosec // path is the temp file we created
 	if err != nil {
 		// File may already be gone.
 		_ = os.Remove(path)

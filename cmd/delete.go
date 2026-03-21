@@ -27,8 +27,8 @@ Use --prefix to delete all secrets matching a prefix:
 		path := args[0]
 		cfg := config.Load()
 
-		if _, err := os.Stat(cfg.DBPath); os.IsNotExist(err) {
-			return fmt.Errorf("database not found at %s — run \"wzrd-vault init\" to create it", cfg.DBPath)
+		if err := requireStore(cfg); err != nil {
+			return err
 		}
 
 		s, err := store.Open(cfg.DBPath)
@@ -45,7 +45,9 @@ Use --prefix to delete all secrets matching a prefix:
 }
 
 func deleteSingle(s *store.Store, path string) error {
-	if !s.Exists(path) {
+	if exists, err := s.Exists(path); err != nil {
+		return err
+	} else if !exists {
 		return newExitError(3, "secret not found: %q — run \"wzrd-vault list\" to see available paths", path)
 	}
 

@@ -50,8 +50,8 @@ Examples:
 		cfg := config.Load()
 
 		// Verify store exists.
-		if _, err := os.Stat(cfg.DBPath); os.IsNotExist(err) {
-			return fmt.Errorf("database not found at %s — run \"wzrd-vault init\" to create it", cfg.DBPath)
+		if err := requireStore(cfg); err != nil {
+			return err
 		}
 
 		// Read public key.
@@ -73,7 +73,9 @@ Examples:
 		}
 		defer func() { _ = s.Close() }()
 
-		if !setForce && s.Exists(path) {
+		if exists, err := s.Exists(path); err != nil {
+			return err
+		} else if !setForce && exists {
 			tty, ttyErr := os.OpenFile("/dev/tty", os.O_RDONLY, 0)
 			if ttyErr != nil {
 				return fmt.Errorf("secret %q already exists — use --force to overwrite", path)

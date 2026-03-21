@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS schema_version (
     version     INTEGER NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_secrets_path_prefix ON secrets(path);
 CREATE INDEX IF NOT EXISTS idx_secrets_expires ON secrets(expires_at) WHERE expires_at IS NOT NULL;
 `
 
@@ -120,14 +119,20 @@ func (s *Store) migrate() error {
 	}
 
 	if count == 0 {
-		// Fresh database — apply schema and record version.
-		if _, err := s.db.Exec(schemaSQL); err != nil {
-			return fmt.Errorf("apply schema: %w", err)
+		// Fresh database — apply schema and record version inside a transaction.
+		tx, err := s.db.Begin()
+		if err != nil {
+			return fmt.Errorf("beginning migration transaction: %w", err)
 		}
-		if _, err := s.db.Exec("INSERT INTO schema_version (version) VALUES (1)"); err != nil {
-			return fmt.Errorf("record schema version: %w", err)
+		if _, err := tx.Exec(schemaSQL); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("creating schema: %w", err)
 		}
-		return nil
+		if _, err := tx.Exec("INSERT INTO schema_version (version) VALUES (1)"); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("setting schema version: %w", err)
+		}
+		return tx.Commit()
 	}
 
 	// Existing database — verify version is compatible.
@@ -232,11 +237,15 @@ func (s *Store) Get(path string) (*Secret, error) {
 	return &sec, nil
 }
 
-// Exists reports whether a secret at path exists in the store.
-func (s *Store) Exists(path string) bool {
+// Exists reports whether a secret exists at the given path.
+// Returns false and a nil error if the path does not exist.
+func (s *Store) Exists(path string) (bool, error) {
 	var count int
 	err := s.db.QueryRow("SELECT COUNT(*) FROM secrets WHERE path = ?", path).Scan(&count)
-	return err == nil && count > 0
+	if err != nil {
+		return false, fmt.Errorf("checking existence of %q: %w", path, err)
+	}
+	return count > 0, nil
 }
 
 // List returns all secrets whose path starts with prefix, sorted by path.

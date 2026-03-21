@@ -30,8 +30,8 @@ Optionally filter by prefix:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.Load()
 
-		if _, err := os.Stat(cfg.DBPath); os.IsNotExist(err) {
-			return fmt.Errorf("database not found at %s — run \"wzrd-vault init\" to create it", cfg.DBPath)
+		if err := requireStore(cfg); err != nil {
+			return err
 		}
 
 		s, err := store.Open(cfg.DBPath)

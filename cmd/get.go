@@ -30,8 +30,8 @@ The passphrase prompt goes to stderr, so piping works correctly:
 		cfg := config.Load()
 
 		// Verify store exists.
-		if _, err := os.Stat(cfg.DBPath); os.IsNotExist(err) {
-			return fmt.Errorf("database not found at %s — run \"wzrd-vault init\" to create it", cfg.DBPath)
+		if err := requireStore(cfg); err != nil {
+			return err
 		}
 
 		// Open store.

@@ -49,8 +49,8 @@ Examples:
 		cfg := config.Load()
 
 		// Verify store exists.
-		if _, err := os.Stat(cfg.DBPath); os.IsNotExist(err) {
-			return fmt.Errorf("database not found at %s — run \"wzrd-vault init\" to create it", cfg.DBPath)
+		if err := requireStore(cfg); err != nil {
+			return err
 		}
 
 		// Read all of stdin.
@@ -145,7 +145,9 @@ Examples:
 		for _, path := range paths {
 			value := secrets[path]
 
-			if s.Exists(path) && !importForce {
+			if exists, err := s.Exists(path); err != nil {
+				return err
+			} else if exists && !importForce {
 				fmt.Fprintf(os.Stderr, "skipping %q — already exists (use --force to overwrite)\n", path)
 				skipped++
 				continue

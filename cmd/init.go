@@ -69,7 +69,7 @@ a command-line argument.`,
 		}
 
 		// Store public key.
-		if err := os.WriteFile(cfg.PublicKeyPath, []byte(identity.PublicKey+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(cfg.PublicKeyPath, []byte(identity.PublicKey+"\n"), 0o644); err != nil { //nolint:gosec // public key is intentionally world-readable
 			return fmt.Errorf("writing public key to %s: %w", cfg.PublicKeyPath, err)
 		}
 

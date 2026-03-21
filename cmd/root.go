@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/brndnsvr/wzrd-vault/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +29,15 @@ func SetVersionInfo(v, c, d string) {
 
 func Execute() error {
 	return rootCmd.Execute()
+}
+
+// requireStore checks that the vault database exists and returns an actionable
+// error if it doesn't.
+func requireStore(cfg config.Config) error {
+	if _, err := os.Stat(cfg.DBPath); os.IsNotExist(err) {
+		return fmt.Errorf("database not found at %s — run \"wzrd-vault init\" to create it", cfg.DBPath)
+	}
+	return nil
 }
 
 var (
