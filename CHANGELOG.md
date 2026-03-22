@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-21
+
+### Fixed
+- Dotenv export now escapes `$`, backtick, and `\r` in double-quoted values (prevents shell injection when sourced)
+- `WZVAULT_PASSPHRASE_FD` stripped from editor subprocess environment (was only stripping `AGE_KEY`)
+- SQLite deadlock when importing with `MaxOpenConns(1)` — `ExistsTx` now runs within the import transaction
+- `ParseExpiry` hoisted out of filter loop in `list --expiring` (was re-parsing + re-calling `time.Now()` per entry)
+- `init --force` now logs warnings when old file removal fails instead of silently continuing
+
+### Changed
+- SQLite hardened: `busy_timeout=5000`, `MaxOpenConns(1)`, `umask(0077)` for WAL/SHM sidecar files
+- Database file pre-created at `0600` before `sql.Open` (eliminates TOCTOU permission window)
+- `schema_version` table uses singleton pattern with `CHECK(id = 1)`
+- Import is now transactional — partial failures roll back the entire batch
+- Delete confirmation prompts use `/dev/tty` (consistent with set command)
+- `--prefix-strip` auto-appends trailing `/` if missing
+- Public-key newline stripping standardized to `strings.TrimSpace` across all commands
+- `migrate()` commit error now wrapped with context
+- Store `doc.go` updated to document WAL mode, busy timeout, and permission strategy
+
+### Added
+- `ExistsTx` method on store for transaction-aware existence checks
+- `SetTx` method on store for transactional batch inserts
+- `Begin` method on store for explicit transaction control
+- `make test-integration` Makefile target
+- Integration test for dotenv export escaping of `$` and backtick characters
+- Advisory expiry behavior documented in README security model, `get` help text, and `list` help text
+- `init` help text documents `--force` file removal behavior
+- `edit` help text documents environment sanitization
+- CONTRIBUTING.md references `make test-integration`
+
 ## [0.2.0] - 2026-03-20
 
 ### Fixed
@@ -54,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI with GitHub Actions (ubuntu + macos, Go 1.22 + 1.23)
 - GoReleaser configuration for cross-platform releases
 
-[Unreleased]: https://github.com/brndnsvr/wzrd-vault/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/brndnsvr/wzrd-vault/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/brndnsvr/wzrd-vault/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/brndnsvr/wzrd-vault/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/brndnsvr/wzrd-vault/releases/tag/v0.1.0

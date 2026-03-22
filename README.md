@@ -421,6 +421,10 @@ wzrd-vault does **not** protect against:
 
 wzrd-vault is designed for single-user local use on a machine you control. It is not a multi-user secrets manager or a substitute for a hardware security module.
 
+### Expiry behavior
+
+Secret expiry (`--expires` on `set`) is **advisory only**. Expired secrets remain accessible via `get` and `export`. Use `wzrd-vault list --expired` to find secrets past their expiry date for manual rotation. Enforcement on read is not currently implemented.
+
 ---
 
 ## Configuration
