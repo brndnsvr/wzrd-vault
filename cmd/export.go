@@ -129,6 +129,9 @@ Examples:
 					escaped := strings.ReplaceAll(value, `\`, `\\`)
 					escaped = strings.ReplaceAll(escaped, `"`, `\"`)
 					escaped = strings.ReplaceAll(escaped, "\n", `\n`)
+					escaped = strings.ReplaceAll(escaped, "$", `\$`)
+					escaped = strings.ReplaceAll(escaped, "`", "\\`")
+					escaped = strings.ReplaceAll(escaped, "\r", `\r`)
 					fmt.Printf("%s=\"%s\"\n", envVar, escaped)
 				} else {
 					fmt.Printf("%s=%s\n", envVar, value)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"syscall"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -21,7 +22,8 @@ CREATE TABLE IF NOT EXISTS secrets (
 );
 
 CREATE TABLE IF NOT EXISTS schema_version (
-    version     INTEGER NOT NULL
+    id      INTEGER PRIMARY KEY CHECK (id = 1),
+    version INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_secrets_expires ON secrets(expires_at) WHERE expires_at IS NOT NULL;
@@ -70,10 +72,27 @@ type Store struct {
 // Open opens (or creates) the SQLite database at dbPath, enables WAL mode,
 // and applies the schema migration.
 func Open(dbPath string) (*Store, error) {
+	// Pre-create the database file with restrictive permissions so the OS
+	// never has a window where it exists with world-readable bits.
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		f, err := os.OpenFile(dbPath, os.O_CREATE|os.O_RDWR, 0o600)
+		if err != nil {
+			return nil, fmt.Errorf("creating database file %q: %w", dbPath, err)
+		}
+		_ = f.Close()
+	}
+
+	// Set a restrictive umask so WAL/SHM sidecar files inherit owner-only
+	// permissions. Restore the original umask immediately after Open returns.
+	oldUmask := syscall.Umask(0o077)
 	db, err := sql.Open("sqlite", dbPath)
+	syscall.Umask(oldUmask)
 	if err != nil {
 		return nil, fmt.Errorf("open database %q: %w", dbPath, err)
 	}
+
+	// Limit to a single connection so WAL locking is straightforward.
+	db.SetMaxOpenConns(1)
 
 	// Enable WAL mode for better concurrent read performance.
 	if _, err := db.Exec("PRAGMA journal_mode=WAL;"); err != nil {
@@ -87,15 +106,16 @@ func Open(dbPath string) (*Store, error) {
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
+	// Set a busy timeout so concurrent CLI invocations wait rather than error.
+	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("setting busy timeout: %w", err)
+	}
+
 	s := &Store{db: db}
 	if err := s.migrate(); err != nil {
 		_ = db.Close()
 		return nil, err
-	}
-
-	if err := os.Chmod(dbPath, 0o600); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("setting database permissions: %w", err)
 	}
 
 	return s, nil
@@ -128,11 +148,14 @@ func (s *Store) migrate() error {
 			_ = tx.Rollback()
 			return fmt.Errorf("creating schema: %w", err)
 		}
-		if _, err := tx.Exec("INSERT INTO schema_version (version) VALUES (1)"); err != nil {
+		if _, err := tx.Exec("INSERT INTO schema_version (id, version) VALUES (1, 1)"); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("setting schema version: %w", err)
 		}
-		return tx.Commit()
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("committing migration transaction: %w", err)
+		}
+		return nil
 	}
 
 	// Existing database — verify version is compatible.

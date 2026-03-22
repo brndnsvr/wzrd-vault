@@ -478,3 +478,27 @@ func TestIntegration_Completion(t *testing.T) {
 		})
 	}
 }
+
+func TestIntegration_ExportDotenvEscaping(t *testing.T) {
+	v := setupTestVault(t)
+
+	// Store a value with dangerous shell characters.
+	v.run(t, "$(whoami) `id` $HOME", "set", "test/dangerous")
+
+	// Export as dotenv.
+	stdout, _, code := v.run(t, "", "export", "--format", "dotenv")
+	if code != 0 {
+		t.Fatalf("export exit code = %d", code)
+	}
+
+	// The output must contain escaped versions of the dangerous characters.
+	if !strings.Contains(stdout, `\$(whoami)`) {
+		t.Errorf("dotenv export missing escaped dollar-paren: %s", stdout)
+	}
+	if !strings.Contains(stdout, "\\`id\\`") {
+		t.Errorf("dotenv export missing escaped backtick sequence: %s", stdout)
+	}
+	if !strings.Contains(stdout, `\$HOME`) {
+		t.Errorf("dotenv export missing escaped dollar HOME: %s", stdout)
+	}
+}
