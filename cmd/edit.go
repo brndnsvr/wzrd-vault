@@ -25,7 +25,11 @@ the updated value. Uses $EDITOR, $VISUAL, or vi as fallback.
 
 The plaintext is written to a temporary file in a RAM-backed directory
 when possible. The file is securely wiped (overwritten with zeros and
-unlinked) on exit, even if interrupted by SIGINT or SIGTERM.`,
+unlinked) on exit, even if interrupted by SIGINT or SIGTERM.
+
+The editor subprocess environment is sanitized — WZVAULT_AGE_KEY and
+WZVAULT_PASSPHRASE_FD are stripped to prevent secret material from
+leaking to the editor or its child processes.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path := args[0]
@@ -111,8 +115,8 @@ unlinked) on exit, even if interrupted by SIGINT or SIGTERM.`,
 		editorCmd.Stdin = os.Stdin
 		editorCmd.Stdout = os.Stdout
 		editorCmd.Stderr = os.Stderr
-		// Don't leak WZVAULT_AGE_KEY to the editor process.
-		editorCmd.Env = filterEnv(os.Environ(), "WZVAULT_AGE_KEY")
+		// Don't leak sensitive env vars to the editor process.
+		editorCmd.Env = filterEnv(filterEnv(os.Environ(), "WZVAULT_AGE_KEY"), "WZVAULT_PASSPHRASE_FD")
 
 		if err := editorCmd.Run(); err != nil {
 			return fmt.Errorf("editor exited with error: %w — secret not updated", err)
