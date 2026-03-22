@@ -23,7 +23,10 @@ trailing newline by default, making it safe for piping into other commands.
 Use -n/--newline to append a newline for terminal readability.
 
 The passphrase prompt goes to stderr, so piping works correctly:
-  curl -H "Authorization: Bearer $(wzrd-vault get dev/github/pat)" https://api.github.com/user`,
+  curl -H "Authorization: Bearer $(wzrd-vault get dev/github/pat)" https://api.github.com/user
+
+Note: expired secrets are still accessible via get. Expiry is advisory —
+use "wzrd-vault list --expired" to find secrets past their expiry date.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path := args[0]

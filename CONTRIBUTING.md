@@ -33,6 +33,12 @@ Run integration tests. These build the binary and exercise it end-to-end, so
 they require a working Go toolchain and a writable temp directory:
 
 ```
+make test-integration
+```
+
+Or invoke go directly:
+
+```
 go test -tags=integration ./cmd/ -race -count=1 -timeout=120s
 ```
 

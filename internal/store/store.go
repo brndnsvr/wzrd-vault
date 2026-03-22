@@ -212,6 +212,38 @@ func (s *Store) Set(path string, ciphertext []byte, metadata *string, expiresAt 
 	return nil
 }
 
+// Begin starts a transaction. Use with SetTx for batch operations.
+func (s *Store) Begin() (*sql.Tx, error) {
+	return s.db.Begin()
+}
+
+// SetTx stores a secret within an existing transaction.
+func (s *Store) SetTx(tx *sql.Tx, path string, ciphertext []byte, metadata *string, expiresAt *time.Time) error {
+	if err := ValidatePath(path); err != nil {
+		return err
+	}
+
+	var expiresStr *string
+	if expiresAt != nil {
+		formatted := expiresAt.UTC().Format(time.RFC3339)
+		expiresStr = &formatted
+	}
+
+	_, err := tx.Exec(`
+		INSERT INTO secrets (path, ciphertext, metadata, expires_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(path) DO UPDATE SET
+			ciphertext = excluded.ciphertext,
+			metadata = excluded.metadata,
+			updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
+			expires_at = excluded.expires_at
+	`, path, ciphertext, metadata, expiresStr)
+	if err != nil {
+		return fmt.Errorf("storing secret at %q: %w", path, err)
+	}
+	return nil
+}
+
 // Get retrieves a secret by path. Returns NotFoundError if the path does not exist.
 func (s *Store) Get(path string) (*Secret, error) {
 	row := s.db.QueryRow(`

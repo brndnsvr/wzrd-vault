@@ -52,7 +52,12 @@ func deleteSingle(s *store.Store, path string) error {
 	}
 
 	if !deleteForce {
-		confirmed := cli.PromptYesNo(os.Stdin, os.Stderr, fmt.Sprintf("Delete secret %q?", path))
+		tty, ttyErr := os.OpenFile("/dev/tty", os.O_RDONLY, 0)
+		if ttyErr != nil {
+			return fmt.Errorf("cannot prompt for confirmation — use --force to skip: %w", ttyErr)
+		}
+		defer func() { _ = tty.Close() }()
+		confirmed := cli.PromptYesNo(tty, os.Stderr, fmt.Sprintf("Delete secret %q?", path))
 		if !confirmed {
 			fmt.Fprintln(os.Stderr, "Aborted.")
 			return nil
@@ -80,7 +85,12 @@ func deleteByPrefix(s *store.Store, prefix string) error {
 		for _, e := range entries {
 			fmt.Fprintf(os.Stderr, "  %s\n", e.Path)
 		}
-		confirmed := cli.PromptYesNo(os.Stdin, os.Stderr, "Continue?")
+		tty, ttyErr := os.OpenFile("/dev/tty", os.O_RDONLY, 0)
+		if ttyErr != nil {
+			return fmt.Errorf("cannot prompt for confirmation — use --force to skip: %w", ttyErr)
+		}
+		defer func() { _ = tty.Close() }()
+		confirmed := cli.PromptYesNo(tty, os.Stderr, "Continue?")
 		if !confirmed {
 			fmt.Fprintln(os.Stderr, "Aborted.")
 			return nil

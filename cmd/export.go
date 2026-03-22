@@ -150,7 +150,12 @@ Examples:
 // underscores and the result is uppercased.
 func pathToEnvVar(path string) string {
 	if exportPrefixStrip != "" {
-		path = strings.TrimPrefix(path, exportPrefixStrip)
+		// Ensure prefix ends with / for clean stripping.
+		strip := exportPrefixStrip
+		if !strings.HasSuffix(strip, "/") {
+			strip += "/"
+		}
+		path = strings.TrimPrefix(path, strip)
 	}
 	return strings.ToUpper(strings.ReplaceAll(path, "/", "_"))
 }

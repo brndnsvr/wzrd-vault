@@ -59,10 +59,7 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("reading public key at %s — run \"wzrd-vault init\" to create it: %w", cfg.PublicKeyPath, err)
 		}
-		publicKey := string(pubKeyData)
-		if len(publicKey) > 0 && publicKey[len(publicKey)-1] == '\n' {
-			publicKey = publicKey[:len(publicKey)-1]
-		}
+		publicKey := strings.TrimSpace(string(pubKeyData))
 
 		// Open store and check for existing secret BEFORE reading stdin.
 		// This avoids consuming stdin then failing on the existence check —

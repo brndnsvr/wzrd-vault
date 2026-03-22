@@ -39,6 +39,9 @@ Dotenv rules:
 
 JSON format: a flat object mapping path strings to secret values.
 
+Import is atomic — if any secret fails to store, the entire batch is rolled
+back and no changes are made to the vault.
+
 Examples:
   cat .env | wzrd-vault import --prefix dev/myapp
   cat secrets.json | wzrd-vault import --format json
@@ -125,7 +128,7 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("reading public key at %s — run \"wzrd-vault init\" to create it: %w", cfg.PublicKeyPath, err)
 		}
-		publicKey := strings.TrimRight(string(pubKeyData), "\n")
+		publicKey := strings.TrimSpace(string(pubKeyData))
 
 		// Open store.
 		s, err := store.Open(cfg.DBPath)
@@ -141,11 +144,17 @@ Examples:
 		}
 		sort.Strings(paths)
 
+		tx, err := s.Begin()
+		if err != nil {
+			return fmt.Errorf("starting import transaction: %w", err)
+		}
+
 		var imported, skipped int
 		for _, path := range paths {
 			value := secrets[path]
 
 			if exists, err := s.Exists(path); err != nil {
+				_ = tx.Rollback()
 				return err
 			} else if exists && !importForce {
 				fmt.Fprintf(os.Stderr, "skipping %q — already exists (use --force to overwrite)\n", path)
@@ -155,13 +164,19 @@ Examples:
 
 			ciphertext, err := crypto.Encrypt([]byte(value), publicKey)
 			if err != nil {
+				_ = tx.Rollback()
 				return fmt.Errorf("encrypting %q: %w", path, err)
 			}
 
-			if err := s.Set(path, ciphertext, nil, nil); err != nil {
+			if err := s.SetTx(tx, path, ciphertext, nil, nil); err != nil {
+				_ = tx.Rollback()
 				return fmt.Errorf("storing %q: %w", path, err)
 			}
 			imported++
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("committing import: %w", err)
 		}
 
 		fmt.Fprintf(os.Stderr, "Imported %d secret(s)", imported)

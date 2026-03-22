@@ -69,7 +69,7 @@ leaking to the editor or its child processes.`,
 		if err != nil {
 			return fmt.Errorf("reading public key: %w", err)
 		}
-		publicKey := strings.TrimRight(string(pubKeyData), "\n")
+		publicKey := strings.TrimSpace(string(pubKeyData))
 
 		// Create secure temp file.
 		tmpDir := secureTmpDir()

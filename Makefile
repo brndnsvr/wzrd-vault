@@ -4,7 +4,7 @@ DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 BINARY  := wzrd-vault
 
-.PHONY: build install test lint clean coverage
+.PHONY: build install test test-integration lint clean coverage
 
 build:
 	go build -ldflags="$(LDFLAGS)" -o bin/$(BINARY) .
@@ -14,6 +14,9 @@ install: build
 
 test:
 	go test ./... -race -count=1
+
+test-integration:
+	go test -tags=integration ./cmd/ -race -count=1 -timeout=120s
 
 coverage:
 	go test ./... -race -count=1 -coverprofile=coverage.out
