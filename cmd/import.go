@@ -153,7 +153,7 @@ Examples:
 		for _, path := range paths {
 			value := secrets[path]
 
-			if exists, err := s.Exists(path); err != nil {
+			if exists, err := s.ExistsTx(tx, path); err != nil {
 				_ = tx.Rollback()
 				return err
 			} else if exists && !importForce {

@@ -303,6 +303,16 @@ func (s *Store) Exists(path string) (bool, error) {
 	return count > 0, nil
 }
 
+// ExistsTx reports whether a secret exists at the given path within a transaction.
+func (s *Store) ExistsTx(tx *sql.Tx, path string) (bool, error) {
+	var count int
+	err := tx.QueryRow("SELECT COUNT(*) FROM secrets WHERE path = ?", path).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("checking existence of %q: %w", path, err)
+	}
+	return count > 0, nil
+}
+
 // List returns all secrets whose path starts with prefix, sorted by path.
 // If prefix is empty, all secrets are returned.
 func (s *Store) List(prefix string) ([]ListEntry, error) {
