@@ -75,7 +75,7 @@ func Open(dbPath string) (*Store, error) {
 	// Pre-create the database file with restrictive permissions so the OS
 	// never has a window where it exists with world-readable bits.
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		f, err := os.OpenFile(dbPath, os.O_CREATE|os.O_RDWR, 0o600)
+		f, err := os.OpenFile(dbPath, os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // dbPath is caller-controlled, not user input
 		if err != nil {
 			return nil, fmt.Errorf("creating database file %q: %w", dbPath, err)
 		}
