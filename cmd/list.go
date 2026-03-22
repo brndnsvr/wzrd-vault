@@ -25,7 +25,10 @@ var listCmd = &cobra.Command{
 because paths are not encrypted — only values are.
 
 Optionally filter by prefix:
-  wzrd-vault list work/`,
+  wzrd-vault list work/
+
+The --expired and --expiring filters show secrets with advisory expiry dates.
+Expiry is not enforced on read — expired secrets remain accessible via get.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.Load()
@@ -53,6 +56,14 @@ Optionally filter by prefix:
 		// Filter by expiry.
 		if listExpired || listExpiring != "" {
 			now := time.Now()
+			var threshold time.Time
+			if listExpiring != "" {
+				var err error
+				threshold, err = duration.ParseExpiryAt(listExpiring, now)
+				if err != nil {
+					return err
+				}
+			}
 			var filtered []store.ListEntry
 			for _, e := range entries {
 				if e.ExpiresAt == nil {
@@ -62,14 +73,8 @@ Optionally filter by prefix:
 					filtered = append(filtered, e)
 					continue
 				}
-				if listExpiring != "" {
-					threshold, err := duration.ParseExpiry(listExpiring)
-					if err != nil {
-						return err
-					}
-					if e.ExpiresAt.After(now) && e.ExpiresAt.Before(threshold) {
-						filtered = append(filtered, e)
-					}
+				if listExpiring != "" && e.ExpiresAt.After(now) && e.ExpiresAt.Before(threshold) {
+					filtered = append(filtered, e)
 				}
 			}
 			entries = filtered

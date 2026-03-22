@@ -22,7 +22,10 @@ the private key with a passphrase, creates the SQLite database, and writes
 a default configuration file.
 
 The passphrase is collected via terminal prompt — it is never accepted as
-a command-line argument.`,
+a command-line argument.
+
+When --force is set, existing vault files (database, identity, public key)
+are removed before creating new ones. Warnings are printed if removal fails.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.Load()
@@ -34,9 +37,15 @@ a command-line argument.`,
 
 		// If force reinit, remove old files.
 		if initForce {
-			_ = os.Remove(cfg.DBPath)
-			_ = os.Remove(cfg.IdentityPath)
-			_ = os.Remove(cfg.PublicKeyPath)
+			if err := os.Remove(cfg.DBPath); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "warning: could not remove old database: %v\n", err)
+			}
+			if err := os.Remove(cfg.IdentityPath); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "warning: could not remove old identity: %v\n", err)
+			}
+			if err := os.Remove(cfg.PublicKeyPath); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "warning: could not remove old public key: %v\n", err)
+			}
 		}
 
 		// Create config directory.
