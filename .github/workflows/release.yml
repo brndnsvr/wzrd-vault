@@ -22,3 +22,15 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger Homebrew tap update
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.TAP_TOKEN }}" \
+            https://api.github.com/repos/brndnsvr/homebrew-tap/dispatches \
+            -d '{"event_type":"wzrd-vault-release","client_payload":{"version":"${{ steps.version.outputs.version }}"}}'

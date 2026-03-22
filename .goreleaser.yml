@@ -42,14 +42,3 @@ changelog:
       - '^ci:'
       - '^chore:'
 
-brews:
-  - repository:
-      owner: brndnsvr
-      name: homebrew-tap
-    homepage: "https://github.com/brndnsvr/wzrd-vault"
-    description: "Local-first secrets manager. Never leaks secrets to process arguments."
-    license: "MIT"
-    install: |
-      bin.install "wzrd-vault"
-    test: |
-      system "#{bin}/wzrd-vault", "version"
